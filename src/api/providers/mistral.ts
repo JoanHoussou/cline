@@ -21,10 +21,10 @@ export class MistralHandler implements ApiHandler {
 	}
 
 	async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
-		const mistralMessages = [
-			{ role: "system", content: systemPrompt },
-			...convertToOpenAiMessages(messages),
-		];
+		const mistralMessages = convertToOpenAiMessages(messages);
+		if (systemPrompt) {
+			mistralMessages.unshift({ role: "system", content: systemPrompt });
+		}
 
 		const response = await fetch(`${this.apiUrl}/chat/completions`, {
 			method: "POST",
@@ -35,13 +35,14 @@ export class MistralHandler implements ApiHandler {
 			body: JSON.stringify({
 				model: this.getModel().id,
 				messages: mistralMessages,
-				temperature: 0,
+				temperature: 0.7,
 				stream: true,
 			}),
 		});
 
 		if (!response.ok) {
-			throw new Error(`Mistral API error: ${response.status} ${response.statusText}`);
+			const errorText = await response.text();
+			throw new Error(`Mistral API error: ${response.status} ${response.statusText} - ${errorText}`);
 		}
 
 		const reader = response.body?.getReader();
@@ -59,30 +60,38 @@ export class MistralHandler implements ApiHandler {
 			try {
 				const lines = chunk.split("\n").filter((line) => line.trim() !== "");
 				for (const line of lines) {
-					const data = JSON.parse(line);
-					if (data.choices && data.choices[0]?.delta?.content) {
-						yield {
-							type: "text",
-							text: data.choices[0].delta.content,
-						};
-					}
-					if (data.usage) {
-						yield {
-							type: "usage",
-							inputTokens: data.usage.prompt_tokens || 0,
-							outputTokens: data.usage.completion_tokens || 0,
-						};
+					if (!line.startsWith("data: ")) continue;
+					const jsonData = line.replace("data: ", "").trim();
+					if (jsonData === "[DONE]") break;
+					
+					try {
+						const data = JSON.parse(jsonData);
+						if (data.choices && data.choices[0]?.delta?.content) {
+							yield {
+								type: "text",
+								text: data.choices[0].delta.content,
+							};
+						}
+						if (data.usage) {
+							yield {
+								type: "usage",
+								inputTokens: data.usage.prompt_tokens || 0,
+								outputTokens: data.usage.completion_tokens || 0,
+							};
+						}
+					} catch (parseError) {
+						console.error("Error parsing JSON data:", parseError, "Line:", jsonData);
 					}
 				}
 			} catch (error) {
-				console.error("Error parsing Mistral API response:", error);
+				console.error("Error processing chunk:", error, "Chunk:", chunk);
 			}
 		}
 	}
 
 	getModel(): { id: string; info: ModelInfo } {
 		return {
-			id: this.options.mistralModelId || "mistral-7b",
+			id: this.options.mistralModelId || "mistral-tiny",
 			info: openAiModelInfoSaneDefaults,
 		};
 	}
