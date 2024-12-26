@@ -128,6 +128,7 @@ const ApiOptions = ({ showModelOptions, apiErrorMessage, modelIdErrorMessage }: 
 					style={{ minWidth: 130, position: "relative", zIndex: OPENROUTER_MODEL_PICKER_Z_INDEX + 1 }}>
 					<VSCodeOption value="openrouter">OpenRouter</VSCodeOption>
 					<VSCodeOption value="anthropic">Anthropic</VSCodeOption>
+					<VSCodeOption value="mistral">Mistral</VSCodeOption>
 					<VSCodeOption value="gemini">Google Gemini</VSCodeOption>
 					<VSCodeOption value="vertex">GCP Vertex AI</VSCodeOption>
 					<VSCodeOption value="bedrock">AWS Bedrock</VSCodeOption>
@@ -381,6 +382,44 @@ const ApiOptions = ({ showModelOptions, apiErrorMessage, modelIdErrorMessage }: 
 							style={{ display: "inline", fontSize: "inherit" }}>
 							{"2) install the Google Cloud CLI › configure Application Default Credentials."}
 						</VSCodeLink>
+					</p>
+				</div>
+			)}
+
+			{selectedProvider === "mistral" && (
+				<div>
+					<VSCodeTextField
+						value={apiConfiguration?.mistralApiKey || ""}
+						style={{ width: "100%" }}
+						type="password"
+						onInput={handleInputChange("mistralApiKey")}
+						placeholder="Enter API Key...">
+						<span style={{ fontWeight: 500 }}>Mistral API Key</span>
+					</VSCodeTextField>
+
+					<VSCodeTextField
+						value={apiConfiguration?.mistralBaseUrl || ""}
+						style={{ width: "100%" }}
+						type="url"
+						onInput={handleInputChange("mistralBaseUrl")}
+						placeholder="Default: https://api.mistral.ai/v1">
+						<span style={{ fontWeight: 500 }}>Base URL (Optional)</span>
+					</VSCodeTextField>
+
+					<p
+						style={{
+							fontSize: "12px",
+							marginTop: 3,
+							color: "var(--vscode-descriptionForeground)",
+						}}>
+						This key is stored locally and only used to make API requests from this extension.
+						{!apiConfiguration?.mistralApiKey && (
+							<VSCodeLink
+								href="https://console.mistral.ai/api-keys/"
+								style={{ display: "inline", fontSize: "inherit" }}>
+								You can get a Mistral API key by signing up here.
+							</VSCodeLink>
+						)}
 					</p>
 				</div>
 			)}
@@ -683,6 +722,8 @@ export const ModelInfoView = ({
 }) => {
 	const isGemini = Object.keys(geminiModels).includes(selectedModelId)
 
+	const doesModelSupportPromptCache = modelInfo?.supportsPromptCache ?? false
+
 	const infoItems = [
 		modelInfo.description && (
 			<ModelDescriptionMarkdown
@@ -707,7 +748,7 @@ export const ModelInfoView = ({
 		!isGemini && (
 			<ModelInfoSupportsItem
 				key="supportsPromptCache"
-				isSupported={modelInfo.supportsPromptCache}
+				isSupported={doesModelSupportPromptCache}
 				supportsLabel="Supports prompt caching"
 				doesNotSupportLabel="Does not support prompt caching"
 			/>
@@ -722,13 +763,13 @@ export const ModelInfoView = ({
 				<span style={{ fontWeight: 500 }}>Input price:</span> {formatPrice(modelInfo.inputPrice)}/million tokens
 			</span>
 		),
-		modelInfo.supportsPromptCache && modelInfo.cacheWritesPrice && (
+		doesModelSupportPromptCache && modelInfo.cacheWritesPrice && (
 			<span key="cacheWritesPrice">
 				<span style={{ fontWeight: 500 }}>Cache writes price:</span>{" "}
 				{formatPrice(modelInfo.cacheWritesPrice || 0)}/million tokens
 			</span>
 		),
-		modelInfo.supportsPromptCache && modelInfo.cacheReadsPrice && (
+		doesModelSupportPromptCache && modelInfo.cacheReadsPrice && (
 			<span key="cacheReadsPrice">
 				<span style={{ fontWeight: 500 }}>Cache reads price:</span>{" "}
 				{formatPrice(modelInfo.cacheReadsPrice || 0)}/million tokens
@@ -840,6 +881,12 @@ export function normalizeApiConfiguration(apiConfiguration?: ApiConfiguration) {
 			return {
 				selectedProvider: provider,
 				selectedModelId: apiConfiguration?.lmStudioModelId || "",
+				selectedModelInfo: openAiModelInfoSaneDefaults,
+			}
+		case "mistral":
+			return {
+				selectedProvider: provider,
+				selectedModelId: apiConfiguration?.mistralModelId || "",
 				selectedModelInfo: openAiModelInfoSaneDefaults,
 			}
 		default:

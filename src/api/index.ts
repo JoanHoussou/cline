@@ -7,9 +7,11 @@ import { VertexHandler } from "./providers/vertex"
 import { OpenAiHandler } from "./providers/openai"
 import { OllamaHandler } from "./providers/ollama"
 import { LmStudioHandler } from "./providers/lmstudio"
-import { GeminiHandler } from "./providers/gemini"
-import { OpenAiNativeHandler } from "./providers/openai-native"
-import { ApiStream } from "./transform/stream"
+import { GeminiHandler } from "./providers/gemini";
+import { OpenAiNativeHandler } from "./providers/openai-native";
+import { MistralHandler } from "./providers/mistral";
+import { ApiStream } from "./transform/stream";
+
 
 export interface ApiHandler {
 	createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream
@@ -36,8 +38,10 @@ export function buildApiHandler(configuration: ApiConfiguration): ApiHandler {
 		case "gemini":
 			return new GeminiHandler(options)
 		case "openai-native":
-			return new OpenAiNativeHandler(options)
+			return new OpenAiNativeHandler(options);
+		case "mistral":
+			return new MistralHandler(options);
 		default:
-			return new AnthropicHandler(options)
+			return new AnthropicHandler(options);
 	}
 }

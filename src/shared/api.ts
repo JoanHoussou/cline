@@ -8,6 +8,7 @@ export type ApiProvider =
 	| "lmstudio"
 	| "gemini"
 	| "openai-native"
+	| "mistral"
 
 export interface ApiHandlerOptions {
 	apiModelId?: string
@@ -33,7 +34,11 @@ export interface ApiHandlerOptions {
 	geminiApiKey?: string
 	openAiNativeApiKey?: string
 	azureApiVersion?: string
+	mistralBaseUrl?: string
+	mistralApiKey?: string
+	mistralModelId?: string
 }
+
 
 export type ApiConfiguration = ApiHandlerOptions & {
 	apiProvider?: ApiProvider
@@ -44,9 +49,15 @@ export type ApiConfiguration = ApiHandlerOptions & {
 export interface ModelInfo {
 	maxTokens?: number
 	contextWindow?: number
+	pricePer1kInput?: number
+	pricePer1kOutput?: number
+	supportsVision?: boolean
+	supportsTools?: boolean
+	supportsJson?: boolean
+	// Legacy properties
 	supportsImages?: boolean
 	supportsComputerUse?: boolean
-	supportsPromptCache: boolean // this value is hardcoded for now
+	supportsPromptCache?: boolean
 	inputPrice?: number
 	outputPrice?: number
 	cacheWritesPrice?: number
@@ -62,43 +73,35 @@ export const anthropicModels = {
 	"claude-3-5-sonnet-20241022": {
 		maxTokens: 8192,
 		contextWindow: 200_000,
-		supportsImages: true,
-		supportsComputerUse: true,
-		supportsPromptCache: true,
-		inputPrice: 3.0, // $3 per million input tokens
-		outputPrice: 15.0, // $15 per million output tokens
-		cacheWritesPrice: 3.75, // $3.75 per million tokens
-		cacheReadsPrice: 0.3, // $0.30 per million tokens
+		supportsVision: true,
+		supportsTools: true,
+		supportsJson: true,
+		pricePer1kInput: 3.0, // $3 per million input tokens
+		pricePer1kOutput: 15.0, // $15 per million output tokens
 	},
 	"claude-3-5-haiku-20241022": {
 		maxTokens: 8192,
 		contextWindow: 200_000,
-		supportsImages: false,
-		supportsPromptCache: true,
-		inputPrice: 1.0,
-		outputPrice: 5.0,
-		cacheWritesPrice: 1.25,
-		cacheReadsPrice: 0.1,
+		supportsVision: false,
+		supportsJson: true,
+		pricePer1kInput: 1.0,
+		pricePer1kOutput: 5.0,
 	},
 	"claude-3-opus-20240229": {
 		maxTokens: 4096,
 		contextWindow: 200_000,
-		supportsImages: true,
-		supportsPromptCache: true,
-		inputPrice: 15.0,
-		outputPrice: 75.0,
-		cacheWritesPrice: 18.75,
-		cacheReadsPrice: 1.5,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 15.0,
+		pricePer1kOutput: 75.0,
 	},
 	"claude-3-haiku-20240307": {
 		maxTokens: 4096,
 		contextWindow: 200_000,
-		supportsImages: true,
-		supportsPromptCache: true,
-		inputPrice: 0.25,
-		outputPrice: 1.25,
-		cacheWritesPrice: 0.3,
-		cacheReadsPrice: 0.03,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 0.25,
+		pricePer1kOutput: 1.25,
 	},
 } as const satisfies Record<string, ModelInfo> // as const assertion makes the object deeply readonly
 
@@ -110,51 +113,51 @@ export const bedrockModels = {
 	"anthropic.claude-3-5-sonnet-20241022-v2:0": {
 		maxTokens: 8192,
 		contextWindow: 200_000,
-		supportsImages: true,
-		supportsComputerUse: true,
-		supportsPromptCache: false,
-		inputPrice: 3.0,
-		outputPrice: 15.0,
+		supportsVision: true,
+		supportsTools: true,
+		supportsJson: true,
+		pricePer1kInput: 3.0,
+		pricePer1kOutput: 15.0,
 	},
 	"anthropic.claude-3-5-haiku-20241022-v1:0": {
 		maxTokens: 8192,
 		contextWindow: 200_000,
-		supportsImages: false,
-		supportsPromptCache: false,
-		inputPrice: 1.0,
-		outputPrice: 5.0,
+		supportsVision: false,
+		supportsJson: true,
+		pricePer1kInput: 1.0,
+		pricePer1kOutput: 5.0,
 	},
 	"anthropic.claude-3-5-sonnet-20240620-v1:0": {
 		maxTokens: 8192,
 		contextWindow: 200_000,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 3.0,
-		outputPrice: 15.0,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 3.0,
+		pricePer1kOutput: 15.0,
 	},
 	"anthropic.claude-3-opus-20240229-v1:0": {
 		maxTokens: 4096,
 		contextWindow: 200_000,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 15.0,
-		outputPrice: 75.0,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 15.0,
+		pricePer1kOutput: 75.0,
 	},
 	"anthropic.claude-3-sonnet-20240229-v1:0": {
 		maxTokens: 4096,
 		contextWindow: 200_000,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 3.0,
-		outputPrice: 15.0,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 3.0,
+		pricePer1kOutput: 15.0,
 	},
 	"anthropic.claude-3-haiku-20240307-v1:0": {
 		maxTokens: 4096,
 		contextWindow: 200_000,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 0.25,
-		outputPrice: 1.25,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 0.25,
+		pricePer1kOutput: 1.25,
 	},
 } as const satisfies Record<string, ModelInfo>
 
@@ -164,15 +167,11 @@ export const openRouterDefaultModelId = "anthropic/claude-3.5-sonnet:beta" // wi
 export const openRouterDefaultModelInfo: ModelInfo = {
 	maxTokens: 8192,
 	contextWindow: 200_000,
-	supportsImages: true,
-	supportsComputerUse: true,
-	supportsPromptCache: true,
-	inputPrice: 3.0,
-	outputPrice: 15.0,
-	cacheWritesPrice: 3.75,
-	cacheReadsPrice: 0.3,
-	description:
-		"The new Claude 3.5 Sonnet delivers better-than-Opus capabilities, faster-than-Sonnet speeds, at the same Sonnet prices. Sonnet is particularly good at:\n\n- Coding: New Sonnet scores ~49% on SWE-Bench Verified, higher than the last best score, and without any fancy prompt scaffolding\n- Data science: Augments human data science expertise; navigates unstructured data while using multiple tools for insights\n- Visual processing: excelling at interpreting charts, graphs, and images, accurately transcribing text to derive insights beyond just the text alone\n- Agentic tasks: exceptional tool use, making it great at agentic tasks (i.e. complex, multi-step problem solving tasks that require engaging with other systems)\n\n#multimodal\n\n_This is a faster endpoint, made available in collaboration with Anthropic, that is self-moderated: response moderation happens on the provider's side instead of OpenRouter's. For requests that pass moderation, it's identical to the [Standard](/anthropic/claude-3.5-sonnet) variant._",
+	supportsVision: true,
+	supportsTools: true,
+	supportsJson: true,
+	pricePer1kInput: 3.0,
+	pricePer1kOutput: 15.0,
 }
 
 // Vertex AI
@@ -183,53 +182,53 @@ export const vertexModels = {
 	"claude-3-5-sonnet-v2@20241022": {
 		maxTokens: 8192,
 		contextWindow: 200_000,
-		supportsImages: true,
-		supportsComputerUse: true,
-		supportsPromptCache: false,
-		inputPrice: 3.0,
-		outputPrice: 15.0,
+		supportsVision: true,
+		supportsTools: true,
+		supportsJson: true,
+		pricePer1kInput: 3.0,
+		pricePer1kOutput: 15.0,
 	},
 	"claude-3-5-sonnet@20240620": {
 		maxTokens: 8192,
 		contextWindow: 200_000,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 3.0,
-		outputPrice: 15.0,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 3.0,
+		pricePer1kOutput: 15.0,
 	},
 	"claude-3-5-haiku@20241022": {
 		maxTokens: 8192,
 		contextWindow: 200_000,
-		supportsImages: false,
-		supportsPromptCache: false,
-		inputPrice: 1.0,
-		outputPrice: 5.0,
+		supportsVision: false,
+		supportsJson: true,
+		pricePer1kInput: 1.0,
+		pricePer1kOutput: 5.0,
 	},
 	"claude-3-opus@20240229": {
 		maxTokens: 4096,
 		contextWindow: 200_000,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 15.0,
-		outputPrice: 75.0,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 15.0,
+		pricePer1kOutput: 75.0,
 	},
 	"claude-3-haiku@20240307": {
 		maxTokens: 4096,
 		contextWindow: 200_000,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 0.25,
-		outputPrice: 1.25,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 0.25,
+		pricePer1kOutput: 1.25,
 	},
 } as const satisfies Record<string, ModelInfo>
 
 export const openAiModelInfoSaneDefaults: ModelInfo = {
 	maxTokens: -1,
 	contextWindow: 128_000,
-	supportsImages: true,
-	supportsPromptCache: false,
-	inputPrice: 0,
-	outputPrice: 0,
+	supportsVision: true,
+	supportsJson: true,
+	pricePer1kInput: 0,
+	pricePer1kOutput: 0,
 }
 
 // Gemini
@@ -240,66 +239,66 @@ export const geminiModels = {
 	"gemini-2.0-flash-thinking-exp-1219": {
 		maxTokens: 8192,
 		contextWindow: 32_767,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 0,
+		pricePer1kOutput: 0,
 	},
 	"gemini-2.0-flash-exp": {
 		maxTokens: 8192,
 		contextWindow: 1_048_576,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 0,
+		pricePer1kOutput: 0,
 	},
 	"gemini-exp-1206": {
 		maxTokens: 8192,
 		contextWindow: 2_097_152,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 0,
+		pricePer1kOutput: 0,
 	},
 	"gemini-1.5-flash-002": {
 		maxTokens: 8192,
 		contextWindow: 1_048_576,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 0,
+		pricePer1kOutput: 0,
 	},
 	"gemini-1.5-flash-exp-0827": {
 		maxTokens: 8192,
 		contextWindow: 1_048_576,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 0,
+		pricePer1kOutput: 0,
 	},
 	"gemini-1.5-flash-8b-exp-0827": {
 		maxTokens: 8192,
 		contextWindow: 1_048_576,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 0,
+		pricePer1kOutput: 0,
 	},
 	"gemini-1.5-pro-002": {
 		maxTokens: 8192,
 		contextWindow: 2_097_152,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 0,
+		pricePer1kOutput: 0,
 	},
 	"gemini-1.5-pro-exp-0827": {
 		maxTokens: 8192,
 		contextWindow: 2_097_152,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 0,
+		pricePer1kOutput: 0,
 	},
 } as const satisfies Record<string, ModelInfo>
 
@@ -312,34 +311,34 @@ export const openAiNativeModels = {
 	"o1-preview": {
 		maxTokens: 32_768,
 		contextWindow: 128_000,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 15,
-		outputPrice: 60,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 15,
+		pricePer1kOutput: 60,
 	},
 	"o1-mini": {
 		maxTokens: 65_536,
 		contextWindow: 128_000,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 3,
-		outputPrice: 12,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 3,
+		pricePer1kOutput: 12,
 	},
 	"gpt-4o": {
 		maxTokens: 4_096,
 		contextWindow: 128_000,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 5,
-		outputPrice: 15,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 5,
+		pricePer1kOutput: 15,
 	},
 	"gpt-4o-mini": {
 		maxTokens: 16_384,
 		contextWindow: 128_000,
-		supportsImages: true,
-		supportsPromptCache: false,
-		inputPrice: 0.15,
-		outputPrice: 0.6,
+		supportsVision: true,
+		supportsJson: true,
+		pricePer1kInput: 0.15,
+		pricePer1kOutput: 0.6,
 	},
 } as const satisfies Record<string, ModelInfo>
 
@@ -347,3 +346,39 @@ export const openAiNativeModels = {
 // https://learn.microsoft.com/en-us/azure/ai-services/openai/api-version-deprecation
 // https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#api-specs
 export const azureOpenAiDefaultApiVersion = "2024-08-01-preview"
+
+// Mistral
+// https://docs.mistral.ai/models/
+export type MistralModelId =
+    | "mistral-tiny"
+    | "mistral-small"
+    | "mistral-medium"
+    | "mistral-large-latest";
+
+export const mistralDefaultModelId: MistralModelId = "mistral-small";
+export const mistralModels: Record<MistralModelId, ModelInfo> = {
+    "mistral-tiny": {
+        maxTokens: 4096,
+        contextWindow: 32_768,
+        pricePer1kInput: 0.14,
+        pricePer1kOutput: 0.42,
+    },
+    "mistral-small": {
+        maxTokens: 4096,
+        contextWindow: 32_768,
+        pricePer1kInput: 0.20,
+        pricePer1kOutput: 0.60,
+    },
+    "mistral-medium": {
+        maxTokens: 4096,
+        contextWindow: 32_768,
+        pricePer1kInput: 0.60,
+        pricePer1kOutput: 1.80,
+    },
+    "mistral-large-latest": {
+        maxTokens: 4096,
+        contextWindow: 32_768,
+        pricePer1kInput: 2.00,
+        pricePer1kOutput: 6.00,
+    },
+};

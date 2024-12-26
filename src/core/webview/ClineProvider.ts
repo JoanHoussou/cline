@@ -266,9 +266,6 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 		// const styleResetUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "assets", "reset.css"))
 		// const styleVSCodeUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "assets", "vscode.css"))
 
-		// // Same for stylesheet
-		// const stylesheetUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "assets", "main.css"))
-
 		// Use a nonce to only allow a specific script to be run.
 		/*
         content security policy of your webview to only allow scripts that have a specific nonce
