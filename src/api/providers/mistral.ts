@@ -6,6 +6,7 @@ import { ApiStream } from "../transform/stream"
 export class MistralHandler implements ApiHandler {
     private options: ApiHandlerOptions
     private apiUrl: string
+    private lastCommandResult?: { success: boolean; output: string }
 
     constructor(options: ApiHandlerOptions) {
         if (!options.mistralApiKey) {
@@ -18,18 +19,41 @@ export class MistralHandler implements ApiHandler {
     async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
         const model = this.getModel()
         
-        // Transform messages into Mistral format
-        const mistralMessages = messages.map(msg => ({
-            role: msg.role === "assistant" ? "assistant" : "user",
-            content: Array.isArray(msg.content) 
-                ? msg.content.map(c => {
-                    if (c.type === "text") {
-                        return c.text
-                    }
-                    return ""
-                }).join("\n")
-                : msg.content
-        }))
+        // Transform messages into Mistral format with command results context
+        const mistralMessages = messages.map(msg => {
+            // Check if this is a tool result message
+            const isToolResult = Array.isArray(msg.content) && 
+                msg.content.some(c => c.type === "tool_result")
+
+            if (isToolResult && this.lastCommandResult) {
+                // Add command result context
+                return {
+                    role: msg.role,
+                    content: `Command result: ${this.lastCommandResult.success ? 'SUCCESS' : 'FAILED'}\nOutput: ${this.lastCommandResult.output}\n\n${
+                        Array.isArray(msg.content) 
+                            ? msg.content.map(c => {
+                                if (c.type === "text") {
+                                    return c.text
+                                }
+                                return ""
+                            }).join("\n")
+                            : msg.content
+                    }`
+                }
+            }
+
+            return {
+                role: msg.role === "assistant" ? "assistant" : "user",
+                content: Array.isArray(msg.content) 
+                    ? msg.content.map(c => {
+                        if (c.type === "text") {
+                            return c.text
+                        }
+                        return ""
+                    }).join("\n")
+                    : msg.content
+            }
+        })
 
         // Add system prompt as first user message
         mistralMessages.unshift({
@@ -98,6 +122,11 @@ export class MistralHandler implements ApiHandler {
             inputTokens: 0, // Mistral API doesn't provide token counts yet
             outputTokens: 0
         }
+    }
+
+    // Méthode pour mettre à jour le résultat de la dernière commande
+    updateLastCommandResult(success: boolean, output: string) {
+        this.lastCommandResult = { success, output }
     }
 
     getModel(): { id: MistralModelId; info: ModelInfo } {

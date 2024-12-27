@@ -12,6 +12,7 @@ import { OpenAiNativeHandler } from "./providers/openai-native";
 import { MistralHandler } from "./providers/mistral";
 import { ApiStream } from "./transform/stream";
 
+export { MistralHandler } from "./providers/mistral";
 
 export interface ApiHandler {
 	createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream
