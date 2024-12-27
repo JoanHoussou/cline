@@ -1,100 +1,111 @@
-import { Anthropic } from "@anthropic-ai/sdk";
-import {
-  ApiHandlerOptions,
-  ModelInfo,
-  openAiModelInfoSaneDefaults,
-} from "../../shared/api";
-import { ApiHandler } from "../index";
-import { convertToOpenAiMessages } from "../transform/openai-format";
-import { ApiStream } from "../transform/stream";
+import { Anthropic } from "@anthropic-ai/sdk"
+import { ApiHandler } from "../"
+import { ApiHandlerOptions, mistralDefaultModelId, MistralModelId, mistralModels, ModelInfo } from "../../shared/api"
+import { ApiStream } from "../transform/stream"
 
 export class MistralHandler implements ApiHandler {
-  private options: ApiHandlerOptions;
-  private apiUrl: string;
+    private options: ApiHandlerOptions
+    private apiUrl: string
 
-  constructor(options: ApiHandlerOptions) {
-    if (!options.mistralApiKey) {
-      throw new Error("API key is required for Mistral");
-    }
-    this.options = options;
-    this.apiUrl = this.options.mistralBaseUrl || "https://api.mistral.ai/v1";
-  }
-
-  async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
-    const mistralMessages = convertToOpenAiMessages(messages);
-    if (systemPrompt) {
-      mistralMessages.unshift({ role: "system", content: systemPrompt });
-    }
-
-    const response = await fetch(`${this.apiUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.options.mistralApiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.getModel().id,
-        messages: mistralMessages,
-        temperature: 0, // Aligné avec la configuration de Gemini pour des réponses plus déterministes
-        stream: true,
-        max_tokens: 4096, // Limite de tokens similaire à Gemini
-        top_p: 1, // Valeur par défaut pour une génération plus stable
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Mistral API error: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error("Mistral API error: No response body");
-    }
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-
-      const chunk = new TextDecoder().decode(value);
-      try {
-        const lines = chunk.split("\n").filter((line) => line.trim() !== "");
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const jsonData = line.replace("data: ", "").trim();
-          if (jsonData === "[DONE]") break;
-          
-          try {
-            const data = JSON.parse(jsonData);
-            if (data.choices && data.choices[0]?.delta?.content) {
-              yield {
-                type: "text",
-                text: data.choices[0].delta.content,
-              };
-            }
-            if (data.usage) {
-              yield {
-                type: "usage",
-                inputTokens: data.usage.prompt_tokens || 0,
-                outputTokens: data.usage.completion_tokens || 0,
-              };
-            }
-          } catch (parseError) {
-            console.error("Error parsing JSON data:", parseError, "Line:", jsonData);
-          }
+    constructor(options: ApiHandlerOptions) {
+        if (!options.mistralApiKey) {
+            throw new Error("API key is required for Mistral")
         }
-      } catch (error) {
-        console.error("Error processing chunk:", error, "Chunk:", chunk);
-      }
+        this.options = options
+        this.apiUrl = this.options.mistralBaseUrl || "https://api.mistral.ai/v1"
     }
-  }
 
-  getModel(): { id: string; info: ModelInfo } {
-    return {
-      id: this.options.mistralModelId || "mistral-tiny",
-      info: openAiModelInfoSaneDefaults,
-    };
-  }
+    async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
+        const model = this.getModel()
+        
+        // Transform messages into Mistral format
+        const mistralMessages = messages.map(msg => ({
+            role: msg.role === "assistant" ? "assistant" : "user",
+            content: Array.isArray(msg.content) 
+                ? msg.content.map(c => {
+                    if (c.type === "text") {
+                        return c.text
+                    }
+                    return ""
+                }).join("\n")
+                : msg.content
+        }))
+
+        // Add system prompt as first user message
+        mistralMessages.unshift({
+            role: "system",
+            content: systemPrompt
+        })
+
+        const response = await fetch(`${this.apiUrl}/chat/completions`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${this.options.mistralApiKey}`
+            },
+            body: JSON.stringify({
+                model: model.id,
+                messages: mistralMessages,
+                temperature: 0,
+                stream: true,
+                max_tokens: model.info.maxTokens || 4096
+            })
+        })
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(`Mistral API error: ${response.status} ${response.statusText} - ${errorText}`)
+        }
+
+        const reader = response.body?.getReader()
+        if (!reader) {
+            throw new Error("Mistral API error: No response body")
+        }
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                const chunk = new TextDecoder().decode(value)
+                const lines = chunk.split("\n").filter(line => line.trim() !== "")
+
+                for (const line of lines) {
+                    if (!line.startsWith("data: ")) continue
+                    const jsonData = line.replace("data: ", "").trim()
+                    if (jsonData === "[DONE]") break
+
+                    try {
+                        const data = JSON.parse(jsonData)
+                        if (data.choices?.[0]?.delta?.content) {
+                            yield {
+                                type: "text",
+                                text: data.choices[0].delta.content
+                            }
+                        }
+                    } catch (parseError) {
+                        console.error("Error parsing JSON data:", parseError)
+                    }
+                }
+            }
+        } finally {
+            reader.releaseLock()
+        }
+
+        // Add usage information at the end
+        yield {
+            type: "usage",
+            inputTokens: 0, // Mistral API doesn't provide token counts yet
+            outputTokens: 0
+        }
+    }
+
+    getModel(): { id: MistralModelId; info: ModelInfo } {
+        const modelId = this.options.apiModelId
+        if (modelId && modelId in mistralModels) {
+            const id = modelId as MistralModelId
+            return { id, info: mistralModels[id] }
+        }
+        return { id: mistralDefaultModelId, info: mistralModels[mistralDefaultModelId] }
+    }
 }
